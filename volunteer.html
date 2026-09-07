@@ -559,6 +559,7 @@ function Admin({profile:initProfile, onLogout, isSuperAdmin=true}){
     ...(isSuperAdmin?[{id:"pending",label:"Pending",count:pending.length,alert:pending.length>0}]:[]),
     ...(isSuperAdmin?[{id:"vols",label:"Volunteers",count:vols.length,alert:false}]:[]),
     ...(isSuperAdmin?[{id:"admins",label:"Admins",count:admins.length,alert:false}]:[]),
+    ...(isSuperAdmin?[{id:"demographics",label:"Demographics",count:null,alert:false}]:[]),
     {id:"opps",label:"Opportunities",count:opps.length,alert:false},
     {id:"hours",label:"Hours",count:null,alert:false},
     {id:"add",label:"+ Add",count:null,alert:false},
@@ -846,6 +847,92 @@ function Admin({profile:initProfile, onLogout, isSuperAdmin=true}){
           </div>}
         </div>)}
       </div>}
+
+      {tab==="demographics"&&(()=>{
+        const total=vols.length;
+        const calcAge=dob=>{
+          if(!dob) return null;
+          const d=new Date(dob), now=new Date();
+          let age=now.getFullYear()-d.getFullYear();
+          const m=now.getMonth()-d.getMonth();
+          if(m<0||(m===0&&now.getDate()<d.getDate())) age--;
+          return age;
+        };
+        const titleCase=s=>s.replace(/\b\w/g,c=>c.toUpperCase());
+        const bucket=(map,key)=>{map[key]=(map[key]||0)+1;};
+
+        const natMap={};
+        vols.forEach(v=>{const n=(v.nationality||"").trim();bucket(natMap,n?titleCase(n):"Not provided");});
+        const natRows=Object.entries(natMap).sort((a,b)=>b[1]-a[1]);
+        const natTop=natRows.slice(0,12);
+        const natRest=natRows.slice(12).reduce((s,[,c])=>s+c,0);
+
+        const ageBrackets=[["Under 18",a=>a<18],["18–24",a=>a>=18&&a<=24],["25–34",a=>a>=25&&a<=34],["35–44",a=>a>=35&&a<=44],["45–54",a=>a>=45&&a<=54],["55+",a=>a>=55]];
+        const ageMap={}; ageBrackets.forEach(([l])=>ageMap[l]=0); ageMap["Not provided"]=0;
+        vols.forEach(v=>{
+          const age=calcAge(v.dob);
+          if(age==null){ageMap["Not provided"]++;return;}
+          const b=ageBrackets.find(([,test])=>test(age));
+          if(b) ageMap[b[0]]++; else ageMap["Not provided"]++;
+        });
+        const ageRows=[...ageBrackets.map(([l])=>[l,ageMap[l]]),["Not provided",ageMap["Not provided"]]];
+
+        const empMap={Student:0,Working:0,"Not currently working":0};
+        vols.forEach(v=>{
+          if(v.is_student) empMap.Student++;
+          else if(v.is_working) empMap.Working++;
+          else empMap["Not currently working"]++;
+        });
+
+        const profMap={};
+        vols.filter(v=>v.is_working).forEach(v=>{const pr=(v.profession||"").trim();bucket(profMap,pr?titleCase(pr):"Not specified");});
+        const profRows=Object.entries(profMap).sort((a,b)=>b[1]-a[1]);
+        const profTop=profRows.slice(0,10);
+        const profRest=profRows.slice(10).reduce((s,[,c])=>s+c,0);
+
+        const Bar=({label,count,max,color})=><div style={{marginBottom:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
+            <span style={{fontWeight:600,color:DK}}>{label}</span>
+            <span style={{color:MT,fontWeight:700}}>{count} · {total?Math.round(count/total*100):0}%</span>
+          </div>
+          <div style={{background:"#F0FDF4",borderRadius:6,height:8,overflow:"hidden"}}>
+            <div style={{width:(max?count/max*100:0)+"%",height:"100%",background:color||MD,borderRadius:6}}/>
+          </div>
+        </div>;
+
+        const natMax=Math.max(1,...natTop.map(([,c])=>c));
+        const ageMax=Math.max(1,...ageRows.map(([,c])=>c));
+        const empMax=Math.max(1,...Object.values(empMap));
+        const profMax=Math.max(1,...profTop.map(([,c])=>c));
+
+        return <div>
+          <h2 style={{fontFamily:HF,fontSize:16,fontWeight:900,textTransform:"uppercase",color:DK,marginBottom:4}}>Volunteer Demographics</h2>
+          <p style={{fontSize:12,color:MT,marginBottom:16}}>Based on {total} approved volunteers.</p>
+
+          <div style={{background:"#fff",borderRadius:14,padding:"16px",border:"1px solid "+BR,marginBottom:16}}>
+            <h3 style={{fontFamily:HF,fontSize:13,fontWeight:900,textTransform:"uppercase",color:DK,marginBottom:12}}>🎓 Employment Status</h3>
+            {Object.entries(empMap).map(([label,count])=><Bar key={label} label={label} count={count} max={empMax}/>)}
+          </div>
+
+          <div style={{background:"#fff",borderRadius:14,padding:"16px",border:"1px solid "+BR,marginBottom:16}}>
+            <h3 style={{fontFamily:HF,fontSize:13,fontWeight:900,textTransform:"uppercase",color:DK,marginBottom:12}}>🎂 Age Breakdown</h3>
+            {ageRows.map(([label,count])=><Bar key={label} label={label} count={count} max={ageMax} color="#9B59B6"/>)}
+          </div>
+
+          <div style={{background:"#fff",borderRadius:14,padding:"16px",border:"1px solid "+BR,marginBottom:16}}>
+            <h3 style={{fontFamily:HF,fontSize:13,fontWeight:900,textTransform:"uppercase",color:DK,marginBottom:12}}>🌍 Nationality{natRest>0?" (top 12 shown)":""}</h3>
+            {natTop.map(([label,count])=><Bar key={label} label={label} count={count} max={natMax} color="#1A9E8F"/>)}
+            {natRest>0&&<p style={{fontSize:11,color:MT,marginTop:4}}>+{natRest} across other nationalities</p>}
+          </div>
+
+          <div style={{background:"#fff",borderRadius:14,padding:"16px",border:"1px solid "+BR,marginBottom:16}}>
+            <h3 style={{fontFamily:HF,fontSize:13,fontWeight:900,textTransform:"uppercase",color:DK,marginBottom:12}}>💼 Profession (working volunteers){profRest>0?" (top 10 shown)":""}</h3>
+            {profTop.length===0&&<p style={{fontSize:12,color:MT}}>No working volunteers with a profession on file yet.</p>}
+            {profTop.map(([label,count])=><Bar key={label} label={label} count={count} max={profMax} color="#E8732A"/>)}
+            {profRest>0&&<p style={{fontSize:11,color:MT,marginTop:4}}>+{profRest} across other professions</p>}
+          </div>
+        </div>;
+      })()}
 
       {tab==="hours"&&<div>
         {/* CSV Upload */}
@@ -1228,6 +1315,16 @@ function Volunteer({profile:initProfile, onLogout, onUpdateProfile}){
         <div>
           <div style={{fontWeight:700,fontSize:13,color:"#92400E"}}>Please add your phone number</div>
           <div style={{fontSize:12,color:"#78350F"}}>We need it to contact you about events.</div>
+        </div>
+      </div>
+      <button onClick={()=>setEditingProfile(true)} style={{background:"#F59E0B",color:"#fff",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>Update Profile</button>
+    </div>}
+    {!profile.nationality&&<div style={{background:"#FEF3C7",borderTop:"3px solid #F59E0B",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,justifyContent:"space-between"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <span style={{fontSize:18}}>🌍</span>
+        <div>
+          <div style={{fontWeight:700,fontSize:13,color:"#92400E"}}>Please add your nationality</div>
+          <div style={{fontSize:12,color:"#78350F"}}>Helps us understand our volunteer community.</div>
         </div>
       </div>
       <button onClick={()=>setEditingProfile(true)} style={{background:"#F59E0B",color:"#fff",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>Update Profile</button>
