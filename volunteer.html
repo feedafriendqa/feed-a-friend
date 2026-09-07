@@ -34,6 +34,7 @@ const sb = supabase.createClient("https://xbxagukdvgyaoqvbqoic.supabase.co", "ey
 const LOGO = "https://xbxagukdvgyaoqvbqoic.supabase.co/storage/v1/object/public/avatars/Faflogowhite.png";
 const EDGE = "https://xbxagukdvgyaoqvbqoic.supabase.co/functions/v1/clever-responder";
 const EDGE_ROLE_AI = "https://xbxagukdvgyaoqvbqoic.supabase.co/functions/v1/generate-role-description";
+const EDGE_OPP_ALERT = "https://xbxagukdvgyaoqvbqoic.supabase.co/functions/v1/opportunity-alert";
 const DK="#0A3D1F",GN="#15803D",MD="#22C55E",PL="#F0FDF4",BR="#BBF7D0",MT="#4B7C5A";
 const HF="'League Spartan',sans-serif",BF="'Poppins',sans-serif";
 const inp = {width:"100%",padding:"12px 14px",border:"1.5px solid #BBF7D0",borderRadius:10,fontSize:15,fontFamily:BF,outline:"none",boxSizing:"border-box",background:"#fff",color:DK};
@@ -80,6 +81,39 @@ function RoleBadge({role}){
 
 function Field({label,children}){
   return <div><label style={{display:"block",fontWeight:700,fontSize:13,color:DK,marginBottom:6,fontFamily:BF}}>{label}</label>{children}</div>;
+}
+
+// Standard, complete list of nationalities/demonyms — every UN member state plus
+// Palestine, Taiwan, Kosovo and a few common regional identities. Kept alphabetical
+// and neutral: nothing is added or removed on political grounds.
+const NATIONALITIES=["Afghan","Albanian","Algerian","American","Andorran","Angolan","Antiguan and Barbudan","Argentine","Armenian","Australian","Austrian","Azerbaijani","Bahamian","Bahraini","Bangladeshi","Barbadian","Belarusian","Belgian","Belizean","Beninese","Bhutanese","Bolivian","Bosnian","Botswanan","Brazilian","British","Bruneian","Bulgarian","Burkinabe","Burmese","Burundian","Cambodian","Cameroonian","Canadian","Cape Verdean","Central African","Chadian","Chilean","Chinese","Colombian","Comoran","Congolese","Costa Rican","Croatian","Cuban","Cypriot","Czech","Danish","Djiboutian","Dominican","Dutch","East Timorese","Ecuadorian","Egyptian","Emirati","English","Equatorial Guinean","Eritrean","Estonian","Ethiopian","Fijian","Filipino","Finnish","French","Gabonese","Gambian","Georgian","German","Ghanaian","Greek","Grenadian","Guatemalan","Guinean","Guinea-Bissauan","Guyanese","Haitian","Honduran","Hungarian","Icelandic","Indian","Indonesian","Iranian","Iraqi","Irish","Israeli","Italian","Ivorian","Jamaican","Japanese","Jordanian","Kazakh","Kenyan","Kittitian","Kosovar","Kuwaiti","Kyrgyz","Laotian","Latvian","Lebanese","Basotho","Liberian","Libyan","Liechtensteiner","Lithuanian","Luxembourgish","Macedonian","Malagasy","Malawian","Malaysian","Maldivian","Malian","Maltese","Marshallese","Mauritanian","Mauritian","Mexican","Micronesian","Moldovan","Monacan","Mongolian","Montenegrin","Moroccan","Mozambican","Namibian","Nauruan","Nepali","New Zealander","Nicaraguan","Nigerian","Nigerien","North Korean","Northern Irish","Norwegian","Omani","Pakistani","Palauan","Palestinian","Panamanian","Papua New Guinean","Paraguayan","Peruvian","Polish","Portuguese","Puerto Rican","Qatari","Romanian","Russian","Rwandan","Saint Lucian","Salvadoran","Samoan","San Marinese","Sao Tomean","Saudi","Scottish","Senegalese","Serbian","Seychellois","Sierra Leonean","Singaporean","Slovak","Slovenian","Solomon Islander","Somali","South African","South Korean","South Sudanese","Spanish","Sri Lankan","Sudanese","Surinamese","Swazi","Swedish","Swiss","Syrian","Taiwanese","Tajik","Tanzanian","Thai","Togolese","Tongan","Trinidadian","Tunisian","Turkish","Turkmen","Tuvaluan","Ugandan","Ukrainian","Uruguayan","Uzbek","Vanuatuan","Venezuelan","Vietnamese","Welsh","Yemeni","Zambian","Zimbabwean"];
+
+// Autocomplete-only nationality picker: filters the standard list as you type and
+// only commits a value when you pick a suggestion (or type an exact match) — no
+// arbitrary free text, so the data stays clean going forward.
+function NationalityField({value,onChange,placeholder}){
+  const [query,setQuery]=React.useState(value||"");
+  const [open,setOpen]=React.useState(false);
+  React.useEffect(()=>{setQuery(value||"");},[value]);
+  const q=query.trim().toLowerCase();
+  const matches=q?NATIONALITIES.filter(n=>n.toLowerCase().includes(q)).slice(0,8):[];
+  const commit=n=>{onChange(n);setQuery(n);setOpen(false);};
+  const handleBlur=()=>{
+    setTimeout(()=>{
+      const exact=NATIONALITIES.find(n=>n.toLowerCase()===q);
+      if(exact){if(exact!==value)onChange(exact);setQuery(exact);}
+      else{setQuery(value||"");}
+      setOpen(false);
+    },150);
+  };
+  return <div style={{position:"relative"}}>
+    <input type="text" value={query} placeholder={placeholder||"Start typing... e.g. Qatari"}
+      onChange={e=>{setQuery(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)} onBlur={handleBlur} style={inp}/>
+    {open&&matches.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1.5px solid "+BR,borderRadius:10,marginTop:4,maxHeight:190,overflowY:"auto",zIndex:50,boxShadow:"0 6px 16px rgba(0,0,0,.12)"}}>
+      {matches.map(n=><div key={n} onMouseDown={()=>commit(n)} style={{padding:"9px 12px",fontSize:14,cursor:"pointer",color:DK,fontFamily:BF}}>{n}</div>)}
+    </div>}
+    {open&&q&&matches.length===0&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1.5px solid "+BR,borderRadius:10,marginTop:4,padding:"9px 12px",fontSize:12,color:MT,zIndex:50}}>No match — please pick from the list.</div>}
+  </div>;
 }
 
 function Toast({msg}){
@@ -248,7 +282,7 @@ function Auth({onAuth}){
         </div>
         <Field label="Date of Birth *"><input type="date" value={r.dob} onChange={e=>setR(x=>{return{...x,dob:e.target.value};} )} style={inp}/></Field>
         <Field label="Phone Number *"><input type="tel" placeholder="e.g. 33123456" value={r.phone||""} onChange={e=>setR(x=>{return{...x,phone:e.target.value};} )} style={inp}/></Field>
-        <Field label="Nationality *"><input type="text" placeholder="e.g. British, Qatari, Egyptian" value={r.nationality||""} onChange={e=>setR(x=>{return{...x,nationality:e.target.value};} )} style={inp}/></Field>
+        <Field label="Nationality *"><NationalityField value={r.nationality} onChange={n=>setR(x=>{return{...x,nationality:n};} )}/></Field>
         <Field label="Email *"><input type="email" placeholder="you@email.com" value={r.email} onChange={e=>setR(x=>{return{...x,email:e.target.value};} )} style={inp}/></Field>
         <Field label="Password *"><input type="password" placeholder="Min. 6 characters" value={r.pw} onChange={e=>setR(x=>{return{...x,pw:e.target.value};} )} style={inp}/></Field>
         <Field label="Confirm Password *"><input type="password" placeholder="Repeat password" value={r.pw2} onChange={e=>setR(x=>{return{...x,pw2:e.target.value};} )} style={inp}/></Field>
@@ -339,7 +373,7 @@ function ProfileEdit({profile, onSave, onBack}){
           <Field label="First Name"><input type="text" value={fn} onChange={e=>setFn(e.target.value)} style={inp}/></Field>
           <Field label="Surname"><input type="text" value={sn} onChange={e=>setSn(e.target.value)} style={inp}/></Field>
           <Field label="Phone Number"><input type="tel" placeholder="e.g. 33123456" value={phone} onChange={e=>setPhone(e.target.value)} style={inp}/></Field>
-          <Field label="Nationality"><input type="text" placeholder="e.g. British, Qatari, Egyptian" value={nationality} onChange={e=>setNationality(e.target.value)} style={inp}/></Field>
+          <Field label="Nationality"><NationalityField value={nationality} onChange={setNationality}/></Field>
           <Field label="Fun Fact About Me (optional)"><input type="text" placeholder="e.g. I once hiked Everest base camp! 🏔️" value={funFact} onChange={e=>setFunFact(e.target.value)} style={inp}/></Field>
           {!isAdmin&&<>
             <Field label="Date of Birth"><input type="date" value={dob} onChange={e=>setDob(e.target.value)} style={inp}/></Field>
@@ -508,10 +542,25 @@ function Admin({profile:initProfile, onLogout, isSuperAdmin=true}){
   };
   const addOpp=async()=>{
     if(!no.title||!no.date||!no.location){st("Fill title, "+(no.type==="ongoing"?"start date":"date")+" and location.");return;}
-    const {error}=await sb.from("opportunities").insert({...no,end_date:no.end_date||null,spots:Number(no.spots)||10,hours:Number(no.hours)||2,commitment_hours:no.type==="ongoing"&&no.commitment_hours?Number(no.commitment_hours):null,commitment_frequency:no.type==="ongoing"?(no.commitment_frequency||"week"):null,event_admins:no.project==="general"?(no.event_admins||[]):[],created_by:profile.id});
+    const {data:inserted,error}=await sb.from("opportunities").insert({...no,end_date:no.end_date||null,spots:Number(no.spots)||10,hours:Number(no.hours)||2,commitment_hours:no.type==="ongoing"&&no.commitment_hours?Number(no.commitment_hours):null,commitment_frequency:no.type==="ongoing"?(no.commitment_frequency||"week"):null,event_admins:no.project==="general"?(no.event_admins||[]):[],created_by:profile.id}).select().single();
     if(error){st("Error: "+error.message);return;}
     setNo({title:"",project:isSuperAdmin?"food-boxes":(profile.admin_projects?.[0]||"food-boxes"),type:"event",date:"",end_date:"",start_time:"",end_time:"",spots:"",hours:"",commitment_hours:"",commitment_frequency:"week",location:"",description:"",students_only:false,student_friendly:false,kid_friendly:false,questions:[],event_admins:[]});
-    st("✓ Published!"); setTab("opps"); load();
+    // Notify approved volunteers whose project interests match this new opportunity,
+    // plus (for student-only / student-friendly events) all students regardless of project.
+    let notified=0;
+    if(inserted){
+      const isStudentEvent=!!(inserted.students_only||inserted.student_friendly);
+      const projectMatched=vols.filter(v=>v.approved&&v.email&&(v.projects||[]).includes(inserted.project)&&(!inserted.students_only||v.is_student));
+      const studentMatched=isStudentEvent?vols.filter(v=>v.approved&&v.email&&v.is_student):[];
+      const byId=new Map();
+      [...projectMatched,...studentMatched].forEach(v=>byId.set(v.id,v));
+      const matched=[...byId.values()];
+      notified=matched.length;
+      if(matched.length>0){
+        fetch(EDGE_OPP_ALERT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({opp:inserted,volunteers:matched.map(v=>({first_name:v.first_name,email:v.email})),matchLabel:gp(inserted.project).emoji+" "+gp(inserted.project).label})}).catch(e=>console.error("opportunity-alert failed:",e));
+      }
+    }
+    st("✓ Published!"+(notified>0?" "+notified+" volunteer"+(notified===1?"":"s")+" notified.":"")); setTab("opps"); load();
   };
   const saveEditOpp=async()=>{
     if(!editOpp.title||!editOpp.date||!editOpp.location){st("Fill title, "+(editOpp.type==="ongoing"?"start date":"date")+" and location.");return;}
@@ -858,11 +907,19 @@ function Admin({profile:initProfile, onLogout, isSuperAdmin=true}){
           if(m<0||(m===0&&now.getDate()<d.getDate())) age--;
           return age;
         };
-        const titleCase=s=>s.replace(/\b\w/g,c=>c.toUpperCase());
+        const titleCase=s=>s.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
         const bucket=(map,key)=>{map[key]=(map[key]||0)+1;};
 
+        // Some volunteers typed the country name, others the nationality/demonym (or a common
+        // typo/abbreviation) — fold known equivalents together so the report isn't fragmented.
+        const NAT_ALIASES={"qatar":"Qatari","egypt":"Egyptian","philippines":"Filipino","pakistan":"Pakistani","usa":"American","us":"American","united states":"American","netherlands":"Dutch","sri lanka":"Sri Lankan","srilankan":"Sri Lankan","bangladesh":"Bangladeshi","nigeria":"Nigerian","kenya":"Kenyan","ethiopia":"Ethiopian","united kingdom":"British","uk":"British","inian":"Indian","na":"Not provided","سوريا":"Syrian","لبناني":"Lebanese","indonesia":"Indonesian"};
         const natMap={};
-        vols.forEach(v=>{const n=(v.nationality||"").trim();bucket(natMap,n?titleCase(n):"Not provided");});
+        vols.forEach(v=>{
+          const raw=(v.nationality||"").trim();
+          if(!raw){bucket(natMap,"Not provided");return;}
+          const alias=NAT_ALIASES[raw.toLowerCase()];
+          bucket(natMap,alias||titleCase(raw));
+        });
         const natRows=Object.entries(natMap).sort((a,b)=>b[1]-a[1]);
         const natTop=natRows.slice(0,12);
         const natRest=natRows.slice(12).reduce((s,[,c])=>s+c,0);
