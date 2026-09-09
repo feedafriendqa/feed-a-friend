@@ -400,17 +400,13 @@ header{background:linear-gradient(120deg,var(--forest) 0%,var(--teal) 70%,var(--
   <!-- PIPELINE TABS -->
   <div class="pipeline" id="pipeline-tabs"></div>
 
-  <!-- YEAR GROUP FILTER -->
+  <!-- AGE FILTER (pre-assessment families are categorized by age, not year group) -->
   <div class="toolbar">
     <div class="search-row">
       <input class="search" id="search-input" placeholder="🔍 Search parent, child, QID, URN, phone…" oninput="renderFams()">
     </div>
-    <select class="fsel" id="filter-yg" onchange="renderFams()">
-      <option value="">All Year Groups</option>
-      <option>FS1</option><option>FS2</option>
-      <option>Year 1</option><option>Year 2</option><option>Year 3</option>
-      <option>Year 4</option><option>Year 5</option><option>Year 6</option>
-      <option>11-13 Special</option>
+    <select class="fsel" id="filter-age" onchange="renderFams()">
+      <option value="">All Ages</option>
     </select>
     <select class="fsel" id="filter-assigned" onchange="renderFams()">
       <option value="">All Handlers</option>
@@ -820,6 +816,7 @@ async function loadData() {
   }
   populateHandlerFilter();
   populateAgeBandSelect();
+  populateAgeFilterSelect();
   renderGreeting();
   renderDash();
   renderPipelineTabs();
@@ -967,6 +964,24 @@ function populateAgeBandSelect() {
     opt.value = b.key; opt.textContent = b.label;
     sel.appendChild(opt);
   });
+}
+
+// Pre-assessment children are categorized/filtered by AGE, not year group —
+// year group is only meaningful once a child has actually been assessed.
+function populateAgeFilterSelect() {
+  const sel = document.getElementById('filter-age');
+  if(!sel || sel.options.length>1) return;
+  AGE_BANDS.forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b.key; opt.textContent = b.label;
+    sel.appendChild(opt);
+  });
+}
+
+function ageBandForChild(child) {
+  const age = childAgeYears(child);
+  if(age===null || age===undefined) return null;
+  return AGE_BANDS.find(b => age>=b.min && age<=b.max) || null;
 }
 
 function onAgeBandChange() {
@@ -2549,7 +2564,7 @@ function renderDash() {
 function goToFamilies({pipeline, assigned, dupOnly} = {}) {
   activePipeline = pipeline || 'all';
   showDupOnly = !!dupOnly;
-  const ygSel = document.getElementById('filter-yg'); if(ygSel) ygSel.value = '';
+  const ygSel = document.getElementById('filter-age'); if(ygSel) ygSel.value = '';
   const assignedSel = document.getElementById('filter-assigned'); if(assignedSel) assignedSel.value = assigned || '';
   const searchInput = document.getElementById('search-input'); if(searchInput) searchInput.value = '';
   const famsBtn = document.querySelector('.bb-item[onclick*="\'fams\'"]');
@@ -2646,7 +2661,7 @@ function populateHandlerFilter() {
 
 function renderFams() {
   const q = (document.getElementById('search-input')?.value||'').toLowerCase();
-  const yg = document.getElementById('filter-yg')?.value||'';
+  const ageBand = document.getElementById('filter-age')?.value||'';
   const assigned = document.getElementById('filter-assigned')?.value||'';
   const dupsAll = detectDups();
 
@@ -2658,15 +2673,15 @@ function renderFams() {
     const matchPipe = activePipeline==='all'||(f.pipeline_status||'new')===activePipeline;
     const matchAssigned = !assigned||(assigned==='unassigned'?!f.assigned_to:f.assigned_to===assigned);
     const matchDup = !showDupOnly||dupsAll.has(f.id);
-    // Year group filter — check children
-    let matchYG = !yg;
+    // Age filter — pre-assessment children are categorized by age, not year group.
+    let matchAge = !ageBand;
     let ygChild = null;
-    if(yg) {
-      ygChild = fkidsAll.find(c=>(c.final_year_group||c.year_group_override||suggestYG(c).yg)===yg);
-      matchYG = !!ygChild;
+    if(ageBand) {
+      ygChild = fkidsAll.find(c=>ageBandForChild(c)?.key===ageBand);
+      matchAge = !!ygChild;
     }
-    return {f, matchQ, matchPipe, matchAssigned, matchYG, matchDup, ygChild};
-  }).filter(x=>x.matchQ&&x.matchPipe&&x.matchAssigned&&x.matchYG&&x.matchDup);
+    return {f, matchQ, matchPipe, matchAssigned, matchAge, matchDup, ygChild};
+  }).filter(x=>x.matchQ&&x.matchPipe&&x.matchAssigned&&x.matchAge&&x.matchDup);
 
   const banner = document.getElementById('dup-filter-banner');
   if(banner) {
@@ -3309,7 +3324,7 @@ function renderAssessment(f, children) {
         <label>Which child is being assessed?</label>
         <select id="a-child-id" onchange="onAssessChildSelect(this.value)">
           <option value="">Select child…</option>
-          ${availableChildren.map(c=>`<option value="${c.id}" ${c.id===assessSelectedChildId?'selected':''}>${c.full_name||'Child'} — ${suggestYG(c).yg}${childAssessments[c.id]?' ✅ saved':''}</option>`).join('')}
+          ${availableChildren.map(c=>`<option value="${c.id}" ${c.id===assessSelectedChildId?'selected':''}>${c.full_name||'Child'}${childAgeYears(c)!==null?' — '+childAgeYears(c)+'y':''}${childAssessments[c.id]?' ✅ saved':''}</option>`).join('')}
         </select>
         ${!availableChildren.length ? '<div style="font-size:12px;color:var(--muted);margin-top:6px;">No children currently available for an introductory call.</div>' : ''}
       </div>
