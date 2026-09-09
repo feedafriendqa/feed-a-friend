@@ -35,6 +35,7 @@ const LOGO = "https://xbxagukdvgyaoqvbqoic.supabase.co/storage/v1/object/public/
 const EDGE = "https://xbxagukdvgyaoqvbqoic.supabase.co/functions/v1/clever-responder";
 const EDGE_ROLE_AI = "https://xbxagukdvgyaoqvbqoic.supabase.co/functions/v1/generate-role-description";
 const EDGE_OPP_ALERT = "https://xbxagukdvgyaoqvbqoic.supabase.co/functions/v1/opportunity-alert";
+const EDGE_SIGNUP_CONFIRMED = "https://xbxagukdvgyaoqvbqoic.supabase.co/functions/v1/signup-confirmed";
 const DK="#0A3D1F",GN="#15803D",MD="#22C55E",PL="#F0FDF4",BR="#BBF7D0",MT="#4B7C5A";
 const HF="'League Spartan',sans-serif",BF="'Poppins',sans-serif";
 const inp = {width:"100%",padding:"12px 14px",border:"1.5px solid #BBF7D0",borderRadius:10,fontSize:15,fontFamily:BF,outline:"none",boxSizing:"border-box",background:"#fff",color:DK};
@@ -116,6 +117,44 @@ function NationalityField({value,onChange,placeholder}){
   </div>;
 }
 
+const LANGUAGES=["English","Arabic","Hindi","Urdu","Tagalog / Filipino","Malayalam","Tamil","Bengali","Nepali","Sinhala","Indonesian / Bahasa","French","Swahili","Amharic","Spanish","Telugu","Punjabi","Pashto","Farsi / Persian","Turkish","Russian","Chinese (Mandarin)","Portuguese","German","Italian"];
+
+// Compact type-to-add multi-select for languages spoken: selected languages
+// show as small removable chips above a single search input. Typing filters
+// the common list; picking a suggestion (or pressing Enter on unmatched
+// text) adds it, so a language that isn't in the list can still be typed
+// in directly — no separate "Other" field needed.
+function LanguagesField({value,onChange}){
+  const list=value||[];
+  const [query,setQuery]=React.useState("");
+  const [open,setOpen]=React.useState(false);
+  const q=query.trim().toLowerCase();
+  const matches=q?LANGUAGES.filter(l=>l.toLowerCase().includes(q)&&!list.includes(l)).slice(0,8):[];
+  const add=lang=>{
+    const v=lang.trim();
+    if(!v) return;
+    if(!list.some(l=>l.toLowerCase()===v.toLowerCase())) onChange([...list,v]);
+    setQuery(""); setOpen(false);
+  };
+  const remove=lang=>onChange(list.filter(l=>l!==lang));
+  return <div>
+    {list.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:8}}>
+      {list.map(l=><span key={l} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:20,background:PL,border:"1.5px solid "+GN,fontSize:13,fontWeight:600,color:GN}}>
+        {l}<button type="button" onClick={()=>remove(l)} style={{background:"none",border:"none",cursor:"pointer",color:GN,fontWeight:900,fontSize:13,lineHeight:1,padding:0}}>×</button>
+      </span>)}
+    </div>}
+    <div style={{position:"relative"}}>
+      <input type="text" placeholder="Type a language and press Enter..." value={query}
+        onChange={e=>{setQuery(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)}
+        onBlur={()=>setTimeout(()=>setOpen(false),150)}
+        onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();add(matches[0]||query);}}} style={inp}/>
+      {open&&matches.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1.5px solid "+BR,borderRadius:10,marginTop:4,maxHeight:190,overflowY:"auto",zIndex:50,boxShadow:"0 6px 16px rgba(0,0,0,.12)"}}>
+        {matches.map(l=><div key={l} onMouseDown={()=>add(l)} style={{padding:"9px 12px",fontSize:14,cursor:"pointer",color:DK,fontFamily:BF}}>{l}</div>)}
+      </div>}
+    </div>
+  </div>;
+}
+
 function Toast({msg}){
   if(!msg) return null;
   return <div style={{position:"fixed",top:68,left:12,right:12,background:DK,color:"#fff",padding:"12px 16px",borderRadius:12,zIndex:9999,fontSize:14,fontWeight:600,textAlign:"center",border:"1px solid "+MD,fontFamily:BF}}>{msg}</div>;
@@ -193,7 +232,7 @@ function Auth({onAuth}){
   const [err,setErr]=useState(""), [msg,setMsg]=useState("");
   const [showPw,setShowPw]=useState(false);
   const [em,setEm]=useState(""), [pw,setPw]=useState("");
-  const [r,setR]=useState({fn:"",sn:"",dob:"",email:"",pw:"",pw2:"",employment:"",student:false,studentLevel:"",studentSchool:"",working:false,prof:"",projs:[],photo:null,photoFile:null,nationality:"",fun_fact:""});
+  const [r,setR]=useState({fn:"",sn:"",dob:"",email:"",pw:"",pw2:"",employment:"",student:false,studentLevel:"",studentSchool:"",working:false,prof:"",projs:[],photo:null,photoFile:null,nationality:"",fun_fact:"",languages:[],preferred_language:""});
 
   async function login(){
     setErr(""); setLoading(true);
@@ -216,7 +255,7 @@ function Auth({onAuth}){
     if(error){setErr(error.message);setLoading(false);return;}
     let photo_url=null;
     if(r.photoFile&&data.user) photo_url=await uploadPhoto(data.user.id,r.photoFile);
-    await sb.from("profiles").insert({id:data.user.id,first_name:r.fn,surname:r.sn,email:r.email,dob:r.dob,phone:r.phone||"",nationality:r.nationality||"",fun_fact:r.fun_fact||"",is_student:r.employment==="student",student_level:r.studentLevel,student_school:r.studentSchool,is_working:r.employment==="working",profession:r.prof,projects:r.projs,photo_url,role:"volunteer",approved:false});
+    await sb.from("profiles").insert({id:data.user.id,first_name:r.fn,surname:r.sn,email:r.email,dob:r.dob,phone:r.phone||"",nationality:r.nationality||"",fun_fact:r.fun_fact||"",is_student:r.employment==="student",student_level:r.studentLevel,student_school:r.studentSchool,is_working:r.employment==="working",profession:r.prof,projects:r.projs,languages:r.languages||[],preferred_language:r.preferred_language||null,photo_url,role:"volunteer",approved:false});
     await sendEmail("volunteer_pending",r.fn,r.email);
     await sendEmail("new_volunteer",r.fn+" "+r.sn,r.email,"salaam@feedafriend.org");
     setMsg("Registration submitted! An admin will review and approve your account shortly.");
@@ -316,6 +355,15 @@ function Auth({onAuth}){
             </label>)}
           </div>
         </Field>
+        <Field label="Languages Spoken"><LanguagesField value={r.languages} onChange={langs=>setR(x=>{return{...x,languages:langs};} )}/></Field>
+        <Field label="Preferred Language">
+          <div style={{display:"flex",gap:8}}>
+            {[{val:"english",label:"English"},{val:"arabic",label:"العربية Arabic"}].map(opt=><label key={opt.val} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8,cursor:"pointer",padding:"10px 12px",borderRadius:10,background:r.preferred_language===opt.val?"#F0FDF4":"#fff",border:"1.5px solid "+(r.preferred_language===opt.val?GN:BR)}}>
+              <input type="radio" name="preferred_language" value={opt.val} checked={r.preferred_language===opt.val} onChange={e=>setR(x=>{return{...x,preferred_language:e.target.value};} )} style={{width:16,height:16,accentColor:GN}}/>
+              <span style={{fontSize:14,fontWeight:600,color:r.preferred_language===opt.val?GN:DK}}>{opt.label}</span>
+            </label>)}
+          </div>
+        </Field>
         <Field label="Fun Fact About Me (optional)"><input type="text" placeholder="e.g. I once hiked Everest base camp! 🏔️" value={r.fun_fact||""} onChange={e=>setR(x=>{return{...x,fun_fact:e.target.value};} )} style={inp}/></Field>
         {err&&<p style={{color:"#DC2626",fontSize:13,fontWeight:600}}>{err}</p>}
         <button onClick={register} disabled={loading} style={{background:DK,color:"#fff",border:"none",borderRadius:12,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",opacity:loading?.7:1}}>{loading?"Submitting...":"Submit Registration"}</button>
@@ -332,6 +380,8 @@ function ProfileEdit({profile, onSave, onBack}){
   const [sn,setSn]=useState(profile.surname||"");
   const [phone,setPhone]=useState(profile.phone||"");
   const [nationality,setNationality]=useState(profile.nationality||"");
+  const [languages,setLanguages]=useState(profile.languages||[]);
+  const [preferredLanguage,setPreferredLanguage]=useState(profile.preferred_language||"");
   const [funFact,setFunFact]=useState(profile.fun_fact||"");
   const [dob,setDob]=useState(profile.dob||"");
   const [employment,setEmployment]=useState(profile.is_student?"student":profile.is_working?"working":"not_working");
@@ -349,7 +399,7 @@ function ProfileEdit({profile, onSave, onBack}){
     setSaving(true);
     let photo_url = profile.photo_url;
     if(photoFile) photo_url = await uploadPhoto(profile.id, photoFile) || photo_url;
-    const updates = {first_name:fn,surname:sn,photo_url,phone,nationality,fun_fact:funFact};
+    const updates = {first_name:fn,surname:sn,photo_url,phone,nationality,languages,preferred_language:preferredLanguage||null,fun_fact:funFact};
     if(!isAdmin){
       Object.assign(updates,{dob,is_student:employment==="student",is_working:employment==="working",student_level:studentLevel,student_school:studentSchool,profession:prof,projects:projs});
     }
@@ -374,6 +424,15 @@ function ProfileEdit({profile, onSave, onBack}){
           <Field label="Surname"><input type="text" value={sn} onChange={e=>setSn(e.target.value)} style={inp}/></Field>
           <Field label="Phone Number"><input type="tel" placeholder="e.g. 33123456" value={phone} onChange={e=>setPhone(e.target.value)} style={inp}/></Field>
           <Field label="Nationality"><NationalityField value={nationality} onChange={setNationality}/></Field>
+          <Field label="Languages Spoken"><LanguagesField value={languages} onChange={setLanguages}/></Field>
+          <Field label="Preferred Language">
+            <div style={{display:"flex",gap:8}}>
+              {[{val:"english",label:"English"},{val:"arabic",label:"العربية Arabic"}].map(opt=><label key={opt.val} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8,cursor:"pointer",padding:"10px 12px",borderRadius:10,background:preferredLanguage===opt.val?"#F0FDF4":"#fff",border:"1.5px solid "+(preferredLanguage===opt.val?GN:BR)}}>
+                <input type="radio" name="edit_preferred_language" value={opt.val} checked={preferredLanguage===opt.val} onChange={e=>setPreferredLanguage(e.target.value)} style={{width:16,height:16,accentColor:GN}}/>
+                <span style={{fontSize:14,fontWeight:600,color:preferredLanguage===opt.val?GN:DK}}>{opt.label}</span>
+              </label>)}
+            </div>
+          </Field>
           <Field label="Fun Fact About Me (optional)"><input type="text" placeholder="e.g. I once hiked Everest base camp! 🏔️" value={funFact} onChange={e=>setFunFact(e.target.value)} style={inp}/></Field>
           {!isAdmin&&<>
             <Field label="Date of Birth"><input type="date" value={dob} onChange={e=>setDob(e.target.value)} style={inp}/></Field>
@@ -499,10 +558,13 @@ function Admin({profile:initProfile, onLogout, isSuperAdmin=true}){
     await fetch(EDGE,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhieGFndWtkdmd5YW9xdmJxb2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNDExNDAsImV4cCI6MjA5NTYxNzE0MH0.-NifUdfkr9cZIDDtKNl5aQe9WMZab7l4boAJDAgfb-4"},body:JSON.stringify({type:"delete_user",userId:id})});
     setViewProf(null); st("Volunteer removed."); load();
   };
-  const approveSignup=async id=>{
+  const approveSignup=async(id,opp,vol)=>{
     const {error}=await sb.from("signups").update({status:"approved"}).eq("id",id);
     if(error){st("Error: "+error.message);return;}
-    st("✓ Signup approved!"); load();
+    if(opp&&vol?.email){
+      fetch(EDGE_SIGNUP_CONFIRMED,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({opp,volunteers:[{first_name:vol.first_name,email:vol.email}]})}).catch(e=>console.error("signup-confirmed failed:",e));
+    }
+    st("✓ Signup approved! Confirmation email sent."); load();
   };
   const declineSignup=async id=>{
     const {error}=await sb.from("signups").delete().eq("id",id);
@@ -564,7 +626,7 @@ function Admin({profile:initProfile, onLogout, isSuperAdmin=true}){
   };
   const saveEditOpp=async()=>{
     if(!editOpp.title||!editOpp.date||!editOpp.location){st("Fill title, "+(editOpp.type==="ongoing"?"start date":"date")+" and location.");return;}
-    const {error}=await sb.from("opportunities").update({title:editOpp.title,description:editOpp.description,type:editOpp.type||"event",date:editOpp.date,end_date:editOpp.end_date||null,location:editOpp.location,spots:Number(editOpp.spots)||10,hours:Number(editOpp.hours)||2,commitment_hours:editOpp.commitment_hours?Number(editOpp.commitment_hours):null,commitment_frequency:editOpp.type==="ongoing"?(editOpp.commitment_frequency||"week"):null,start_time:editOpp.start_time,end_time:editOpp.end_time,students_only:editOpp.students_only,project:editOpp.project,questions:editOpp.questions||[],event_admins:editOpp.project==="general"?(editOpp.event_admins||[]):[]}).eq("id",editOpp.id);
+    const {error}=await sb.from("opportunities").update({title:editOpp.title,description:editOpp.description,type:editOpp.type||"event",date:editOpp.date,end_date:editOpp.end_date||null,location:editOpp.location,location_detail:editOpp.location_detail||null,spots:Number(editOpp.spots)||10,hours:Number(editOpp.hours)||2,commitment_hours:editOpp.commitment_hours?Number(editOpp.commitment_hours):null,commitment_frequency:editOpp.type==="ongoing"?(editOpp.commitment_frequency||"week"):null,start_time:editOpp.start_time,end_time:editOpp.end_time,students_only:editOpp.students_only,project:editOpp.project,questions:editOpp.questions||[],event_admins:editOpp.project==="general"?(editOpp.event_admins||[]):[]}).eq("id",editOpp.id);
     if(error){st("Error: "+error.message);return;}
     st("✓ Updated!"); setEditOpp(null); load();
   };
@@ -632,6 +694,7 @@ function Admin({profile:initProfile, onLogout, isSuperAdmin=true}){
           <div style={{fontSize:12,color:MT,marginTop:2}}>DOB: {viewProf.dob||"Not provided"}</div>
           {viewProf.phone&&<div style={{fontSize:12,color:MT,marginTop:2}}>📞 {viewProf.phone}</div>}
           {viewProf.nationality&&<div style={{fontSize:12,color:MT,marginTop:2}}>🌍 {viewProf.nationality}</div>}
+          {viewProf.languages?.length>0&&<div style={{fontSize:12,color:MT,marginTop:2}}>🗣 {viewProf.languages.join(", ")}{viewProf.preferred_language?" (prefers "+(viewProf.preferred_language==="arabic"?"Arabic":"English")+")":""}</div>}
           {viewProf.fun_fact&&<div style={{fontSize:12,color:MT,marginTop:4,fontStyle:"italic"}}>✨ "{viewProf.fun_fact}"</div>}
           <div style={{marginTop:6}}><span style={{background:DK,color:MD,borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:700}}>⏱ {Math.round(hourLogs.filter(l=>l.volunteer_id===viewProf.id).reduce((s,l)=>s+Number(l.hours),0)*100)/100}h volunteered</span></div>
         </div>
@@ -761,6 +824,7 @@ function Admin({profile:initProfile, onLogout, isSuperAdmin=true}){
               </>
           }
           <Field label="Location *"><input type="text" value={editOpp.location} onChange={e=>setEditOpp(o=>{return{...o,location:e.target.value};} )} style={inp}/></Field>
+          <Field label="Location Detail (floor, office, room — shown in confirmation emails, not used for the map pin)"><input type="text" placeholder="e.g. 2nd Floor, Office 36" value={editOpp.location_detail||""} onChange={e=>setEditOpp(o=>{return{...o,location_detail:e.target.value};} )} style={inp}/></Field>
           <div style={{display:"grid",gridTemplateColumns:editOpp.type==="ongoing"?"1fr":"1fr 1fr",gap:10}}>
             {editOpp.type!=="ongoing"&&<Field label="Hours"><input type="number" value={editOpp.hours} onChange={e=>setEditOpp(o=>{return{...o,hours:e.target.value};} )} style={inp}/></Field>}
             <Field label="Spots"><input type="number" value={editOpp.spots} onChange={e=>setEditOpp(o=>{return{...o,spots:e.target.value};} )} style={inp}/></Field>
@@ -1123,7 +1187,7 @@ function Admin({profile:initProfile, onLogout, isSuperAdmin=true}){
                 </div>}
                 <div style={{display:"flex",gap:6,flexShrink:0}}>
                   {s.status==="pending"&&<div style={{display:"flex",gap:4}}>
-                    <button onClick={()=>approveSignup(s.id)} style={{background:MD,color:DK,border:"none",borderRadius:6,padding:"6px 12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>✓</button>
+                    <button onClick={()=>approveSignup(s.id,o,s.profiles)} style={{background:MD,color:DK,border:"none",borderRadius:6,padding:"6px 12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>✓</button>
                     <button onClick={()=>declineSignup(s.id)} style={{background:"#FEE2E2",color:"#DC2626",border:"none",borderRadius:6,padding:"6px 12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>✕</button>
                   </div>}
                   {s.status==="approved"&&!s.checked_in&&(()=>{
@@ -1199,6 +1263,7 @@ function Admin({profile:initProfile, onLogout, isSuperAdmin=true}){
                 </>
             }
             <Field label="Location *"><input type="text" placeholder="e.g. Feed a Friend HQ" value={no.location} onChange={e=>setNo(n=>{return{...n,location:e.target.value};} )} style={inp}/></Field>
+            <Field label="Location Detail (floor, office, room — shown in confirmation emails, not used for the map pin)"><input type="text" placeholder="e.g. 2nd Floor, Office 36" value={no.location_detail||""} onChange={e=>setNo(n=>{return{...n,location_detail:e.target.value};} )} style={inp}/></Field>
             <Field label="Spots"><input type="number" placeholder="10" value={no.spots} onChange={e=>setNo(n=>{return{...n,spots:e.target.value};} )} style={inp}/></Field>
             <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"12px 14px",borderRadius:10,background:no.students_only?"#EDE9FE":"#F9FAFB",border:"1.5px solid "+(no.students_only?"#9B59B6":"#E5E7EB")}}>
               <input type="checkbox" checked={no.students_only} onChange={e=>setNo(n=>{return{...n,students_only:e.target.checked};} )} style={{width:18,height:18,accentColor:"#9B59B6"}}/>
@@ -1366,26 +1431,25 @@ function Volunteer({profile:initProfile, onLogout, onUpdateProfile}){
       </nav>
     </header>
     <Toast msg={toast}/>
-    {!profile.phone&&<div style={{background:"#FEF3C7",borderTop:"3px solid #F59E0B",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,justifyContent:"space-between"}}>
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
-        <span style={{fontSize:18}}>📞</span>
-        <div>
-          <div style={{fontWeight:700,fontSize:13,color:"#92400E"}}>Please add your phone number</div>
-          <div style={{fontSize:12,color:"#78350F"}}>We need it to contact you about events.</div>
+    {(()=>{
+      const missing=[];
+      if(!profile.phone) missing.push("phone number");
+      if(!profile.nationality) missing.push("nationality");
+      if(!profile.languages||profile.languages.length===0) missing.push("languages spoken");
+      if(!profile.preferred_language) missing.push("preferred language");
+      if(missing.length===0) return null;
+      const label=missing.length===1?missing[0]:missing.slice(0,-1).join(", ")+" and "+missing[missing.length-1];
+      return <div style={{background:"#FEF3C7",borderTop:"3px solid #F59E0B",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:18}}>📋</span>
+          <div>
+            <div style={{fontWeight:700,fontSize:13,color:"#92400E"}}>Please complete your profile</div>
+            <div style={{fontSize:12,color:"#78350F"}}>Missing: {label}.</div>
+          </div>
         </div>
-      </div>
-      <button onClick={()=>setEditingProfile(true)} style={{background:"#F59E0B",color:"#fff",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>Update Profile</button>
-    </div>}
-    {!profile.nationality&&<div style={{background:"#FEF3C7",borderTop:"3px solid #F59E0B",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,justifyContent:"space-between"}}>
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
-        <span style={{fontSize:18}}>🌍</span>
-        <div>
-          <div style={{fontWeight:700,fontSize:13,color:"#92400E"}}>Please add your nationality</div>
-          <div style={{fontSize:12,color:"#78350F"}}>Helps us understand our volunteer community.</div>
-        </div>
-      </div>
-      <button onClick={()=>setEditingProfile(true)} style={{background:"#F59E0B",color:"#fff",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>Update Profile</button>
-    </div>}
+        <button onClick={()=>setEditingProfile(true)} style={{background:"#F59E0B",color:"#fff",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>Update Profile</button>
+      </div>;
+    })()}
     <main style={{maxWidth:640,margin:"0 auto",padding:"16px 14px 40px"}}>
 
       {view==="dashboard"&&<div className="fade">
